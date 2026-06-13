@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#22577a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>カレンダー</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div>
+      <p class="eyebrow">SCHEDULE CALENDAR</p>
+      <h1>カレンダー</h1>
+    </div>
+    <button id="todayButton" class="quiet">今日</button>
+  </header>
+
+  <main>
+    <section class="voice-card">
+      <div>
+        <strong>話すだけで予定を追加</strong>
+        <p id="voiceHint">例：「明日 14時 歯医者」</p>
+      </div>
+      <button id="voiceButton" class="voice" aria-label="音声入力を開始">●</button>
+    </section>
+
+    <section class="notice-card">
+      <div>
+        <strong>予定の1時間前にお知らせ</strong>
+        <p id="noticeStatus">通知を許可するとお知らせします</p>
+      </div>
+      <button id="noticeButton" class="quiet">通知を許可</button>
+    </section>
+
+    <section class="calendar-card">
+      <div class="calendar-nav">
+        <button id="prevButton" class="icon" aria-label="前の月">‹</button>
+        <h2 id="monthTitle"></h2>
+        <button id="nextButton" class="icon" aria-label="次の月">›</button>
+      </div>
+      <div class="weekdays">
+        <span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span>
+      </div>
+      <div id="calendar" class="calendar"></div>
+    </section>
+
+    <section class="agenda">
+      <div class="agenda-title">
+        <div>
+          <p class="eyebrow">SELECTED DAY</p>
+          <h2 id="selectedTitle"></h2>
+        </div>
+        <button id="addButton" class="add">＋ 予定を追加</button>
+      </div>
+      <div id="eventList"></div>
+    </section>
+  </main>
+
+  <dialog id="eventDialog">
+    <form id="eventForm" method="dialog">
+      <input id="eventId" type="hidden">
+      <div class="dialog-head">
+        <h2 id="dialogTitle">予定を追加</h2>
+        <button type="button" id="closeButton" class="icon">×</button>
+      </div>
+      <label>予定名<input id="eventName" required placeholder="例：チーム会議"></label>
+      <div class="form-row">
+        <label>日付<input id="eventDate" type="date" required></label>
+        <label>時刻<select id="eventTime"></select></label>
+      </div>
+      <label>メモ<textarea id="eventMemo" rows="3" placeholder="場所や持ち物など"></textarea></label>
+      <div class="dialog-actions">
+        <button type="button" id="deleteButton" class="danger">削除</button>
+        <button type="button" id="androidCalendarButton" class="quiet">Androidへ登録</button>
+        <button type="submit" class="save">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "name": "カレンダー",
+  "short_name": "カレンダー",
+  "description": "音声入力に対応したスケジュール管理カレンダー",
+  "lang": "ja",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f5f1e8",
+  "theme_color": "#22577a",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
