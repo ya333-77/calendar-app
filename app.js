@@ -63,6 +63,17 @@ let googleAccessToken = "";
 let googleTokenClient = null;
 const googleClientIdKey = "voice-calendar-google-client-id";
 const deletedGoogleIdsKey = "voice-calendar-deleted-google-ids";
+const calendarTimeZone = "Asia/Tokyo";
+
+function formatInCalendarTimeZone(value) {
+  const parts = new Intl.DateTimeFormat("ja-JP", {
+    timeZone: calendarTimeZone,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23"
+  }).formatToParts(new Date(value));
+  const get = (type) => parts.find((part) => part.type === type)?.value;
+  return { date: `${get("year")}-${get("month")}-${get("day")}`, time: `${get("hour")}:${get("minute")}` };
+}
 
 function populateTimeOptions() {
   $("eventTime").innerHTML = '<option value="">終日</option>';
@@ -133,11 +144,11 @@ function googleEventBody(event) {
     reminders: { useDefault: false, overrides: [{ method: "popup", minutes: 60 }] }
   };
   if (event.time) {
-    const start = `${event.date}T${event.time}:00+09:00`;
+    const start = `${event.date}T${event.time}:00`;
     const endDate = new Date(`${event.date}T${event.time}:00`);
     endDate.setHours(endDate.getHours() + 1);
-    body.start = { dateTime: start, timeZone: "Asia/Tokyo" };
-    body.end = { dateTime: `${toKey(endDate)}T${pad(endDate.getHours())}:${pad(endDate.getMinutes())}:00+09:00`, timeZone: "Asia/Tokyo" };
+    body.start = { dateTime: start, timeZone: calendarTimeZone };
+    body.end = { dateTime: `${toKey(endDate)}T${pad(endDate.getHours())}:${pad(endDate.getMinutes())}:00`, timeZone: calendarTimeZone };
   } else {
     const next = fromKey(event.date);
     next.setDate(next.getDate() + 1);
@@ -166,15 +177,15 @@ async function googleRequest(path, options = {}) {
 }
 
 function fromGoogleEvent(item) {
-  const startValue = item.start.dateTime || item.start.date;
-  const date = startValue.slice(0, 10);
-  const time = item.start.dateTime ? startValue.slice(11, 16) : "";
+  const converted = item.start.dateTime
+    ? formatInCalendarTimeZone(item.start.dateTime)
+    : { date: item.start.date, time: "" };
   return {
     id: `google:${item.id}`,
     googleId: item.id,
     name: item.summary || "無題の予定",
-    date,
-    time,
+    date: converted.date,
+    time: converted.time,
     memo: item.description || ""
   };
 }
