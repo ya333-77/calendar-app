@@ -114,6 +114,7 @@ function scheduleNotifications() {
 }
 
 function updateNoticeStatus() {
+  if (!$("noticeStatus") || !$("noticeButton")) return;
   if (!("Notification" in window)) {
     $("noticeStatus").textContent = "このブラウザでは端末通知を利用できません";
     $("noticeButton").disabled = true;
@@ -400,12 +401,14 @@ $("todayButton").addEventListener("click", () => {
   render();
 });
 
-$("noticeButton").addEventListener("click", async () => {
-  if (!("Notification" in window)) return;
-  await Notification.requestPermission();
-  updateNoticeStatus();
-  scheduleNotifications();
-});
+if ($("noticeButton")) {
+  $("noticeButton").addEventListener("click", async () => {
+    if (!("Notification" in window)) return;
+    await Notification.requestPermission();
+    updateNoticeStatus();
+    scheduleNotifications();
+  });
+}
 
 $("syncSettingsButton").addEventListener("click", () => {
   $("googleClientId").value = localStorage.getItem(googleClientIdKey) || "";

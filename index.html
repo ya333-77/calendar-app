@@ -29,25 +29,6 @@
       <button id="voiceButton" class="voice" aria-label="音声入力を開始">●</button>
     </section>
 
-    <section class="notice-card">
-      <div>
-        <strong>予定の1時間前にお知らせ</strong>
-        <p id="noticeStatus">通知を許可するとお知らせします</p>
-      </div>
-      <button id="noticeButton" class="quiet">通知を許可</button>
-    </section>
-
-    <section class="sync-card">
-      <div>
-        <strong>Googleカレンダー完全同期</strong>
-        <p id="syncStatus">未接続です</p>
-      </div>
-      <div class="sync-actions">
-        <button id="syncSettingsButton" class="quiet">接続設定</button>
-        <button id="syncButton" class="add" disabled>同期</button>
-      </div>
-    </section>
-
     <section class="calendar-card">
       <div class="calendar-nav">
         <button id="prevButton" class="icon" aria-label="前の月">‹</button>
@@ -69,6 +50,17 @@
         <button id="addButton" class="add">＋ 予定を追加</button>
       </div>
       <div id="eventList"></div>
+    </section>
+
+    <section class="sync-card">
+      <div>
+        <strong>Googleカレンダー完全同期</strong>
+        <p id="syncStatus">未接続です</p>
+      </div>
+      <div class="sync-actions">
+        <button id="syncSettingsButton" class="quiet">接続設定</button>
+        <button id="syncButton" class="add" disabled>同期</button>
+      </div>
     </section>
   </main>
 
