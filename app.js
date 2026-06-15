@@ -59,6 +59,9 @@ shownMonth.setDate(1);
 let selectedDate = toKey(new Date());
 let events = JSON.parse(localStorage.getItem("voice-calendar-events") || "[]");
 const noticeTimers = new Map();
+let googleAccessToken = "";
+let googleTokenClient = null;
+const googleClientIdKey = "voice-calendar-google-client-id";
 
 function populateTimeOptions() {
   $("eventTime").innerHTML = '<option value="">終日</option>';
@@ -113,6 +116,127 @@ function updateNoticeStatus() {
 function saveEvents() {
   localStorage.setItem("voice-calendar-events", JSON.stringify(events));
   scheduleNotifications();
+}
+
+function updateSyncStatus(text = "") {
+  const connected = Boolean(googleAccessToken);
+  $("syncStatus").textContent = text || (connected ? "Googleカレンダーに接続済み" : "未接続です");
+  $("syncButton").disabled = !connected;
+  $("disconnectButton").style.visibility = localStorage.getItem(googleClientIdKey) ? "visible" : "hidden";
+}
+
+function googleEventBody(event) {
+  const body = {
+    summary: event.name,
+    description: event.memo,
+    reminders: { useDefault: false, overrides: [{ method: "popup", minutes: 60 }] }
+  };
+  if (event.time) {
+    const start = `${event.date}T${event.time}:00+09:00`;
+    const endDate = new Date(`${event.date}T${event.time}:00`);
+    endDate.setHours(endDate.getHours() + 1);
+    body.start = { dateTime: start, timeZone: "Asia/Tokyo" };
+    body.end = { dateTime: `${toKey(endDate)}T${pad(endDate.getHours())}:${pad(endDate.getMinutes())}:00+09:00`, timeZone: "Asia/Tokyo" };
+  } else {
+    const next = fromKey(event.date);
+    next.setDate(next.getDate() + 1);
+    body.start = { date: event.date };
+    body.end = { date: toKey(next) };
+  }
+  return body;
+}
+
+async function googleRequest(path, options = {}) {
+  const response = await fetch(`https://www.googleapis.com/calendar/v3${path}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${googleAccessToken}`,
+      "Content-Type": "application/json",
+      ...(options.headers || {})
+    }
+  });
+  if (response.status === 401) {
+    googleAccessToken = "";
+    updateSyncStatus("接続の有効期限が切れました。再接続してください");
+    throw new Error("Googleへの再接続が必要です");
+  }
+  if (!response.ok) throw new Error(`Google同期エラー (${response.status})`);
+  return response.status === 204 ? null : response.json();
+}
+
+function fromGoogleEvent(item) {
+  const startValue = item.start.dateTime || item.start.date;
+  const date = startValue.slice(0, 10);
+  const time = item.start.dateTime ? startValue.slice(11, 16) : "";
+  return {
+    id: `google:${item.id}`,
+    googleId: item.id,
+    name: item.summary || "無題の予定",
+    date,
+    time,
+    memo: item.description || ""
+  };
+}
+
+async function pushEventToGoogle(event) {
+  const body = JSON.stringify(googleEventBody(event));
+  if (event.googleId) {
+    await googleRequest(`/calendars/primary/events/${encodeURIComponent(event.googleId)}`, { method: "PUT", body });
+    return event;
+  }
+  const created = await googleRequest("/calendars/primary/events", { method: "POST", body });
+  event.googleId = created.id;
+  event.id = `google:${created.id}`;
+  return event;
+}
+
+async function syncGoogleCalendar() {
+  if (!googleAccessToken) return;
+  updateSyncStatus("同期しています…");
+  try {
+    const localOnly = events.filter((event) => !event.googleId);
+    for (const event of localOnly) await pushEventToGoogle(event);
+    const min = new Date();
+    const max = new Date();
+    min.setFullYear(min.getFullYear() - 1);
+    max.setFullYear(max.getFullYear() + 2);
+    const query = new URLSearchParams({
+      timeMin: min.toISOString(), timeMax: max.toISOString(),
+      singleEvents: "true", orderBy: "startTime", maxResults: "2500"
+    });
+    const result = await googleRequest(`/calendars/primary/events?${query}`);
+    const googleEvents = result.items.filter((item) => item.status !== "cancelled").map(fromGoogleEvent);
+    events = [...events.filter((event) => !event.googleId), ...googleEvents];
+    saveEvents();
+    render();
+    updateSyncStatus(`同期完了：${googleEvents.length}件`);
+  } catch (error) {
+    updateSyncStatus(error.message);
+  }
+}
+
+function connectGoogle() {
+  const clientId = $("googleClientId").value.trim();
+  if (!clientId || !window.google?.accounts?.oauth2) {
+    updateSyncStatus("Google接続の準備中です。少し待って再度お試しください");
+    return;
+  }
+  localStorage.setItem(googleClientIdKey, clientId);
+  googleTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: clientId,
+    scope: "https://www.googleapis.com/auth/calendar.events",
+    callback: async (response) => {
+      if (response.error) {
+        updateSyncStatus("Googleへの接続に失敗しました");
+        return;
+      }
+      googleAccessToken = response.access_token;
+      $("syncDialog").close();
+      updateSyncStatus();
+      await syncGoogleCalendar();
+    }
+  });
+  googleTokenClient.requestAccessToken({ prompt: "consent" });
 }
 
 function render() {
@@ -192,7 +316,7 @@ function openDialog(event = null) {
   setTimeout(() => $("eventName").focus(), 50);
 }
 
-$("eventForm").addEventListener("submit", (event) => {
+$("eventForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   const id = $("eventId").value || crypto.randomUUID();
   const item = {
@@ -202,7 +326,12 @@ $("eventForm").addEventListener("submit", (event) => {
     time: $("eventTime").value,
     memo: $("eventMemo").value.trim()
   };
+  const old = events.find((entry) => entry.id === id);
+  if (old?.googleId) item.googleId = old.googleId;
   events = events.filter((entry) => entry.id !== id);
+  if (googleAccessToken) {
+    try { await pushEventToGoogle(item); } catch (error) { updateSyncStatus(error.message); }
+  }
   events.push(item);
   selectedDate = item.date;
   shownMonth = new Date(fromKey(item.date).getFullYear(), fromKey(item.date).getMonth(), 1);
@@ -211,7 +340,13 @@ $("eventForm").addEventListener("submit", (event) => {
   render();
 });
 
-$("deleteButton").addEventListener("click", () => {
+$("deleteButton").addEventListener("click", async () => {
+  const item = events.find((event) => event.id === $("eventId").value);
+  if (googleAccessToken && item?.googleId) {
+    try {
+      await googleRequest(`/calendars/primary/events/${encodeURIComponent(item.googleId)}`, { method: "DELETE" });
+    } catch (error) { updateSyncStatus(error.message); return; }
+  }
   events = events.filter((event) => event.id !== $("eventId").value);
   saveEvents();
   $("eventDialog").close();
@@ -233,6 +368,26 @@ $("noticeButton").addEventListener("click", async () => {
   await Notification.requestPermission();
   updateNoticeStatus();
   scheduleNotifications();
+});
+
+$("syncSettingsButton").addEventListener("click", () => {
+  $("googleClientId").value = localStorage.getItem(googleClientIdKey) || "";
+  updateSyncStatus();
+  $("syncDialog").showModal();
+});
+$("syncCloseButton").addEventListener("click", () => $("syncDialog").close());
+$("syncForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  connectGoogle();
+});
+$("syncButton").addEventListener("click", syncGoogleCalendar);
+$("disconnectButton").addEventListener("click", () => {
+  if (googleAccessToken && window.google?.accounts?.oauth2) google.accounts.oauth2.revoke(googleAccessToken);
+  googleAccessToken = "";
+  googleTokenClient = null;
+  localStorage.removeItem(googleClientIdKey);
+  $("syncDialog").close();
+  updateSyncStatus();
 });
 
 $("androidCalendarButton").addEventListener("click", () => {
@@ -303,6 +458,7 @@ if (SpeechRecognition) {
 
 populateTimeOptions();
 updateNoticeStatus();
+updateSyncStatus();
 scheduleNotifications();
 render();
 

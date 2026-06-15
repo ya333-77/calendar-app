@@ -56,7 +56,7 @@ main {
   align-items: center;
   justify-content: space-between;
 }
-.notice-card {
+.notice-card, .sync-card {
   grid-column: 1 / -1;
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -67,7 +67,9 @@ main {
   justify-content: space-between;
   gap: 12px;
 }
-.notice-card p { margin-top: 4px; color: var(--muted); font-size: 12px; }
+.notice-card p, .sync-card p { margin-top: 4px; color: var(--muted); font-size: 12px; }
+.sync-actions { display: flex; gap: 8px; }
+.help { margin-bottom: 18px; color: var(--muted); font-size: 13px; line-height: 1.7; }
 .voice-card p { margin-top: 5px; color: #d7e8ec; font-size: 14px; }
 .voice {
   width: 58px;
@@ -182,7 +184,8 @@ input, textarea, select {
 
 @media (max-width: 760px) {
   main { display: block; padding: 0 12px 32px; }
-  .voice-card, .notice-card, .calendar-card, .agenda { margin-bottom: 14px; }
+  .voice-card, .notice-card, .sync-card, .calendar-card, .agenda { margin-bottom: 14px; }
+  .sync-card { align-items: flex-start; }
   header { padding: 22px 16px 14px; }
   .day { min-height: 48px; }
   .agenda-title { align-items: flex-end; }
