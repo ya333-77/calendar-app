@@ -62,6 +62,7 @@ const noticeTimers = new Map();
 let googleAccessToken = "";
 let googleTokenClient = null;
 const googleClientIdKey = "voice-calendar-google-client-id";
+const deletedGoogleIdsKey = "voice-calendar-deleted-google-ids";
 
 function populateTimeOptions() {
   $("eventTime").innerHTML = '<option value="">終日</option>';
@@ -182,11 +183,13 @@ async function pushEventToGoogle(event) {
   const body = JSON.stringify(googleEventBody(event));
   if (event.googleId) {
     await googleRequest(`/calendars/primary/events/${encodeURIComponent(event.googleId)}`, { method: "PUT", body });
+    event.dirty = false;
     return event;
   }
   const created = await googleRequest("/calendars/primary/events", { method: "POST", body });
   event.googleId = created.id;
   event.id = `google:${created.id}`;
+  event.dirty = false;
   return event;
 }
 
@@ -194,8 +197,17 @@ async function syncGoogleCalendar() {
   if (!googleAccessToken) return;
   updateSyncStatus("同期しています…");
   try {
-    const localOnly = events.filter((event) => !event.googleId);
-    for (const event of localOnly) await pushEventToGoogle(event);
+    const deletedIds = JSON.parse(localStorage.getItem(deletedGoogleIdsKey) || "[]");
+    for (const id of deletedIds) {
+      try {
+        await googleRequest(`/calendars/primary/events/${encodeURIComponent(id)}`, { method: "DELETE" });
+      } catch (error) {
+        if (!error.message.includes("(410)") && !error.message.includes("(404)")) throw error;
+      }
+    }
+    localStorage.removeItem(deletedGoogleIdsKey);
+    const pending = events.filter((event) => !event.googleId || event.dirty);
+    for (const event of pending) await pushEventToGoogle(event);
     const min = new Date();
     const max = new Date();
     min.setFullYear(min.getFullYear() - 1);
@@ -206,7 +218,7 @@ async function syncGoogleCalendar() {
     });
     const result = await googleRequest(`/calendars/primary/events?${query}`);
     const googleEvents = result.items.filter((item) => item.status !== "cancelled").map(fromGoogleEvent);
-    events = [...events.filter((event) => !event.googleId), ...googleEvents];
+    events = googleEvents;
     saveEvents();
     render();
     updateSyncStatus(`同期完了：${googleEvents.length}件`);
@@ -328,9 +340,13 @@ $("eventForm").addEventListener("submit", async (event) => {
   };
   const old = events.find((entry) => entry.id === id);
   if (old?.googleId) item.googleId = old.googleId;
+  item.dirty = !googleAccessToken;
   events = events.filter((entry) => entry.id !== id);
   if (googleAccessToken) {
-    try { await pushEventToGoogle(item); } catch (error) { updateSyncStatus(error.message); }
+    try { await pushEventToGoogle(item); } catch (error) {
+      item.dirty = true;
+      updateSyncStatus(error.message);
+    }
   }
   events.push(item);
   selectedDate = item.date;
@@ -346,6 +362,10 @@ $("deleteButton").addEventListener("click", async () => {
     try {
       await googleRequest(`/calendars/primary/events/${encodeURIComponent(item.googleId)}`, { method: "DELETE" });
     } catch (error) { updateSyncStatus(error.message); return; }
+  } else if (item?.googleId) {
+    const deletedIds = JSON.parse(localStorage.getItem(deletedGoogleIdsKey) || "[]");
+    if (!deletedIds.includes(item.googleId)) deletedIds.push(item.googleId);
+    localStorage.setItem(deletedGoogleIdsKey, JSON.stringify(deletedIds));
   }
   events = events.filter((event) => event.id !== $("eventId").value);
   saveEvents();
