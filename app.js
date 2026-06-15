@@ -133,9 +133,12 @@ function saveEvents() {
 
 function updateSyncStatus(text = "") {
   const connected = Boolean(googleAccessToken);
-  $("syncStatus").textContent = text || (connected ? "Googleカレンダーに接続済み" : "未接続です");
-  $("syncButton").disabled = !connected;
-  $("disconnectButton").style.visibility = localStorage.getItem(googleClientIdKey) ? "visible" : "hidden";
+  const configured = Boolean(localStorage.getItem(googleClientIdKey));
+  $("syncStatus").textContent = text || (connected
+    ? "Googleカレンダーに接続済み"
+    : configured ? "同期を押すとGoogleへ再接続します" : "未接続です");
+  $("syncButton").disabled = !connected && !configured;
+  $("disconnectButton").style.visibility = configured ? "visible" : "hidden";
 }
 
 function googleEventBody(event) {
@@ -241,8 +244,8 @@ async function syncGoogleCalendar() {
   }
 }
 
-function connectGoogle() {
-  const clientId = $("googleClientId").value.trim();
+function connectGoogle(prompt = "consent") {
+  const clientId = $("googleClientId").value.trim() || localStorage.getItem(googleClientIdKey) || "";
   if (!clientId || !window.google?.accounts?.oauth2) {
     updateSyncStatus("Google接続の準備中です。少し待って再度お試しください");
     return;
@@ -262,7 +265,7 @@ function connectGoogle() {
       await syncGoogleCalendar();
     }
   });
-  googleTokenClient.requestAccessToken({ prompt: "consent" });
+  googleTokenClient.requestAccessToken({ prompt });
 }
 
 function render() {
@@ -414,7 +417,10 @@ $("syncForm").addEventListener("submit", (event) => {
   event.preventDefault();
   connectGoogle();
 });
-$("syncButton").addEventListener("click", syncGoogleCalendar);
+$("syncButton").addEventListener("click", () => {
+  if (googleAccessToken) syncGoogleCalendar();
+  else connectGoogle("");
+});
 $("disconnectButton").addEventListener("click", () => {
   if (googleAccessToken && window.google?.accounts?.oauth2) google.accounts.oauth2.revoke(googleAccessToken);
   googleAccessToken = "";
