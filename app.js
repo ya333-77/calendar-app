@@ -64,10 +64,11 @@ let googleTokenClient = null;
 const googleClientIdKey = "voice-calendar-google-client-id";
 const deletedGoogleIdsKey = "voice-calendar-deleted-google-ids";
 const calendarTimeZone = "Asia/Tokyo";
+let googleCalendarTimeZone = calendarTimeZone;
 
-function formatInCalendarTimeZone(value) {
+function formatInCalendarTimeZone(value, timeZone = calendarTimeZone) {
   const parts = new Intl.DateTimeFormat("ja-JP", {
-    timeZone: calendarTimeZone,
+    timeZone,
     year: "numeric", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit", hourCycle: "h23"
   }).formatToParts(new Date(value));
@@ -178,7 +179,7 @@ async function googleRequest(path, options = {}) {
 
 function fromGoogleEvent(item) {
   const converted = item.start.dateTime
-    ? formatInCalendarTimeZone(item.start.dateTime)
+    ? formatInCalendarTimeZone(item.start.dateTime, item.start.timeZone || googleCalendarTimeZone)
     : { date: item.start.date, time: "" };
   return {
     id: `google:${item.id}`,
@@ -208,6 +209,8 @@ async function syncGoogleCalendar() {
   if (!googleAccessToken) return;
   updateSyncStatus("同期しています…");
   try {
+    const calendar = await googleRequest("/calendars/primary");
+    googleCalendarTimeZone = calendar.timeZone || calendarTimeZone;
     const deletedIds = JSON.parse(localStorage.getItem(deletedGoogleIdsKey) || "[]");
     for (const id of deletedIds) {
       try {
