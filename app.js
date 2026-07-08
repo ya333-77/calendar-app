@@ -213,8 +213,7 @@ async function syncGoogleCalendar() {
   if (!googleAccessToken) return;
   updateSyncStatus("同期しています…");
   try {
-    const calendar = await googleRequest("/calendars/primary");
-    googleCalendarTimeZone = calendar.timeZone || calendarTimeZone;
+    googleCalendarTimeZone = calendarTimeZone;
     const deletedIds = JSON.parse(localStorage.getItem(deletedGoogleIdsKey) || "[]");
     for (const id of deletedIds) {
       try {
@@ -266,7 +265,11 @@ function connectGoogle(prompt = "consent") {
       await syncGoogleCalendar();
     }
   });
-  googleTokenClient.requestAccessToken({ prompt });
+  try {
+    googleTokenClient.requestAccessToken({ prompt });
+  } catch (error) {
+    updateSyncStatus("Google接続画面を開けませんでした。接続設定から再接続してください");
+  }
 }
 
 function render() {
@@ -422,7 +425,7 @@ $("syncForm").addEventListener("submit", (event) => {
 });
 $("syncButton").addEventListener("click", () => {
   if (googleAccessToken) syncGoogleCalendar();
-  else connectGoogle("");
+  else connectGoogle("consent");
 });
 $("disconnectButton").addEventListener("click", () => {
   if (googleAccessToken && window.google?.accounts?.oauth2) google.accounts.oauth2.revoke(googleAccessToken);

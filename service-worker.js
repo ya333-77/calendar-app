@@ -1,4 +1,4 @@
-const CACHE_NAME = "calendar-v8";
+const CACHE_NAME = "calendar-v10";
 const APP_FILES = ["./", "./index.html", "./style.css", "./app.js", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", (event) => {
